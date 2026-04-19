@@ -222,6 +222,12 @@ app.post('/tk88/wallet/deposit', authGuard, (req: AuthedRequest, res) => {
   const row = db.prepare('SELECT balance FROM users WHERE id = ?').get(req.userId!) as {
     balance: number;
   };
+  const u = db.prepare('SELECT username FROM users WHERE id = ?').get(req.userId!) as
+    | { username: string }
+    | undefined;
+  console.log(
+    `[DEPOSIT] pending order=${orderId} user=${u?.username ?? req.userId} amount=${amt} method=${method ?? 'unknown'}`,
+  );
   res.json({
     ok: true,
     orderId,
@@ -744,6 +750,18 @@ app.post('/tk88/admin/api/credit', adminGuard, (req, res) => {
   const amt = Number(amount);
   if (!userId || !Number.isFinite(amt) || amt === 0)
     return res.status(400).json({ error: 'invalid_input' });
+
+  const current = db.prepare('SELECT balance, username FROM users WHERE id = ?').get(userId) as
+    | { balance: number; username: string }
+    | undefined;
+  if (!current) return res.status(404).json({ error: 'user_not_found' });
+  if (amt < 0 && current.balance + amt < 0)
+    return res.status(400).json({
+      error: 'insufficient_balance',
+      currentBalance: current.balance,
+      requested: amt,
+    });
+
   const trx = db.transaction((uid: string, a: number, n: string) => {
     db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(a, uid);
     db.prepare(
@@ -754,6 +772,9 @@ app.post('/tk88/admin/api/credit', adminGuard, (req, res) => {
   const row = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId) as
     | { balance: number }
     | undefined;
+  console.log(
+    `[ADMIN-CREDIT] user=${current.username} delta=${amt > 0 ? '+' : ''}${amt} newBalance=${row?.balance ?? 0} note=${note ?? ''}`,
+  );
   res.json({ ok: true, balance: row?.balance ?? 0 });
 });
 
@@ -1013,7 +1034,7 @@ function render(data) {
           <td>V\${u.vip_level}</td>
           <td style="text-align:right" class="pos">\${fmt(u.balance)}</td>
           <td class="mono">\${u.created_at}</td>
-          <td><button class="action credit" onclick="openCredit('\${u.id}', '\${u.username}')">+ / –</button></td>
+          <td><button class="action credit" onclick="openCredit('\${u.id}', '\${u.username}', \${u.balance})">+ / –</button></td>
         </tr>\`).join('')}
       </tbody>
     </table>\`;
@@ -1043,31 +1064,39 @@ window.gotoPage = function(p) {
   refresh();
 };
 
-window.openCredit = function(userId, username) {
+window.openCredit = function(userId, username, currentBalance) {
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.innerHTML = \`
     <div class="modal-body">
       <h3>Điều chỉnh số dư: \${username}</h3>
-      <p style="color:#999;font-size:11px">Nhập số dương để cộng, số âm để trừ.</p>
-      <input id="amt" type="number" placeholder="VD: 500000 hoặc -100000" autofocus/>
+      <p style="color:#aaa;font-size:12px;margin:4px 0 10px">Số dư hiện tại: <b style="color:#FFD700">\${fmt(currentBalance)}</b></p>
+      <label style="color:#999;font-size:11px">Số tiền (luôn dương)</label>
+      <input id="amt" type="number" min="0" step="1000" placeholder="VD: 500000" autofocus/>
       <input id="note" type="text" placeholder="Ghi chú (vd: nạp CK Vietinbank)"/>
-      <div class="row">
+      <div class="row" style="gap:6px">
         <button class="reject" onclick="this.closest('.modal').remove()">Hủy</button>
-        <button style="background:#4ade80;color:#000" onclick="submitCredit('\${userId}')">Xác nhận</button>
+        <button style="background:#ef4444;color:#fff" onclick="submitCredit('\${userId}', -1)">− Trừ tiền</button>
+        <button style="background:#4ade80;color:#000" onclick="submitCredit('\${userId}', 1)">+ Cộng tiền</button>
       </div>
     </div>\`;
   document.body.appendChild(modal);
 };
 
-window.submitCredit = async function(userId) {
-  const amount = Number(document.getElementById('amt').value);
+window.submitCredit = async function(userId, sign) {
+  const raw = Number(document.getElementById('amt').value);
   const note = document.getElementById('note').value;
-  if (!amount) return alert('Nhập số tiền');
-  await api('/tk88/admin/api/credit', {
+  if (!raw || raw <= 0) return alert('Nhập số tiền dương');
+  const amount = Math.abs(raw) * (sign < 0 ? -1 : 1);
+  const res = await api('/tk88/admin/api/credit', {
     method: 'POST',
     body: JSON.stringify({ userId, amount, note }),
   });
+  if (res && res.error) {
+    if (res.error === 'insufficient_balance')
+      return alert('Không đủ số dư. Hiện tại: ' + fmt(res.currentBalance) + ', cần trừ: ' + fmt(Math.abs(res.requested)));
+    return alert('Lỗi: ' + res.error);
+  }
   document.querySelector('.modal')?.remove();
   refresh();
 };

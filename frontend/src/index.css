@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --casino-red: #DC143C;
+  --casino-red-dark: #8B0000;
+  --casino-gold: #FFD700;
+  --casino-gold-dark: #B8860B;
+  --casino-black: #0D0D0D;
+  --casino-card: #1F1F1F;
+  --casino-muted: #B0B0B0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+body {
+  font-family: 'Inter', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--casino-black);
+  color: #fff;
+}
+
+html { scroll-behavior: smooth; }
+
+::selection {
+  background-color: var(--casino-gold);
+  color: #000;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--casino-gold), var(--casino-red));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--casino-red); }
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .text-gradient-cta {
+    background: linear-gradient(135deg, #FFD700 0%, #DC143C 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255,215,0,0.3), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+}

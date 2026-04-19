@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: tk88-postgres
+    environment:
+      POSTGRES_USER: tk88_user
+      POSTGRES_PASSWORD: tk88_password_dev
+      POSTGRES_DB: tk88_gaming
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tk88_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: tk88-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongo:
+    image: mongo:6
+    container_name: tk88-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: tk88_user
+      MONGO_INITDB_ROOT_PASSWORD: tk88_password_dev
+      MONGO_INITDB_DATABASE: tk88_gaming
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: tk88-backend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: tk88_gaming
+      DB_USER: tk88_user
+      DB_PASSWORD: tk88_password_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MONGODB_URI: mongodb://tk88_user:tk88_password_dev@mongo:27017/tk88_gaming?authSource=admin
+      JWT_SECRET: your_jwt_secret_key_change_in_production
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+      - /app/node_modules
+    command: npm run dev
+
+  # Frontend Service (optional, can run separately)
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/frontend.Dockerfile
+  #   container_name: tk88-frontend
+  #   ports:
+  #     - "5173:5173"
+  #   environment:
+  #     VITE_API_URL: http://localhost:3000
+  #     VITE_WS_URL: ws://localhost:3000
+  #   depends_on:
+  #     - backend
+  #   volumes:
+  #     - ./frontend/src:/app/src
+  #     - /app/node_modules
+  #   command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongo_data:
+
+networks:
+  default:
+    name: tk88-network

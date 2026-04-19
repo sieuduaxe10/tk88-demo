@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+*.log
+logs
+tk88-lite.db
+tk88-lite.db-shm
+tk88-lite.db-wal
+.env
+.env.local
+dist
+.git

@@ -1,0 +1,10 @@
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "frontend/dist"
+
+# SPA fallback — mọi route của React Router fallback về index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
